@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["examples/with_winit", "examples/run_wasm", "examples/scenes"]
+# TODO: examples need updating for vello_hybrid
+# members = ["examples/with_winit", "examples/run_wasm", "examples/scenes"]
 
 [workspace.package]
 edition = "2024"
@@ -74,7 +75,8 @@ clippy.wildcard_dependencies = "warn"
 
 [workspace.dependencies]
 # NOTE: Make sure to keep this in sync with the version badge in README.md
-vello = { version = "0.9.0", default-features = false }
+vello_hybrid = { path = "../vello/sparse_strips/vello_hybrid" }
+vello_common = { path = "../vello/sparse_strips/vello_common", features = ["std"] }
 
 [package]
 name = "vello_svg"
@@ -110,25 +112,10 @@ targets = []
 workspace = true
 
 [dependencies]
-vello = { workspace = true }
+vello_hybrid = { workspace = true }
+vello_common = { workspace = true }
 thiserror = "2.0.18"
 usvg = "0.46.0"
-image = { version = "0.25.9", default-features = false, features = [
-    "webp",
-    "png",
-    "jpeg",
-    "gif",
-], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3.58"
-
-[features]
-default = ["image_format_png", "image_format_gif", "image_format_jpeg", "image_format_webp"]
-# Enables the wgpu feature on vello, which is disabled by default
-wgpu = ["vello/wgpu"]
-image = ["dep:image"]
-image_format_png = ["image", "image/png"]
-image_format_jpeg = ["image", "image/jpeg"]
-image_format_gif = ["image", "image/gif"]
-image_format_webp = ["image", "image/webp"]

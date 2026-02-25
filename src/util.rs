@@ -1,13 +1,11 @@
 // Copyright 2023 the Vello Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use vello::Scene;
-use vello::kurbo::{Affine, BezPath, Point, Rect, Stroke};
-use vello::peniko::color::{DynamicColor, palette};
-use vello::peniko::{Brush, Color, Fill};
-
-#[cfg(feature = "image")]
-use vello::peniko::{Blob, ImageBrush};
+use vello_common::kurbo::{Affine, BezPath, Point, Rect, Stroke};
+use vello_common::paint::PaintType;
+use vello_common::peniko::color::{DynamicColor, palette};
+use vello_common::peniko::{Brush, Color};
+use vello_hybrid::Scene;
 
 pub fn to_affine(ts: &usvg::Transform) -> Affine {
     let usvg::Transform {
@@ -24,14 +22,14 @@ pub fn to_affine(ts: &usvg::Transform) -> Affine {
 pub fn to_stroke(stroke: &usvg::Stroke) -> Stroke {
     let mut conv_stroke = Stroke::new(stroke.width().get() as f64)
         .with_caps(match stroke.linecap() {
-            usvg::LineCap::Butt => vello::kurbo::Cap::Butt,
-            usvg::LineCap::Round => vello::kurbo::Cap::Round,
-            usvg::LineCap::Square => vello::kurbo::Cap::Square,
+            usvg::LineCap::Butt => vello_common::kurbo::Cap::Butt,
+            usvg::LineCap::Round => vello_common::kurbo::Cap::Round,
+            usvg::LineCap::Square => vello_common::kurbo::Cap::Square,
         })
         .with_join(match stroke.linejoin() {
-            usvg::LineJoin::Miter | usvg::LineJoin::MiterClip => vello::kurbo::Join::Miter,
-            usvg::LineJoin::Round => vello::kurbo::Join::Round,
-            usvg::LineJoin::Bevel => vello::kurbo::Join::Bevel,
+            usvg::LineJoin::Miter | usvg::LineJoin::MiterClip => vello_common::kurbo::Join::Miter,
+            usvg::LineJoin::Round => vello_common::kurbo::Join::Round,
+            usvg::LineJoin::Bevel => vello_common::kurbo::Join::Bevel,
         })
         .with_miter_limit(stroke.miterlimit().get() as f64);
     if let Some(dash_array) = stroke.dasharray().as_ref() {
@@ -93,24 +91,7 @@ pub fn to_bez_path(path: &usvg::Path) -> BezPath {
     local_path
 }
 
-#[cfg(feature = "image")]
-pub fn into_image(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> ImageBrush {
-    use vello::peniko::ImageAlphaType;
-    use vello::peniko::ImageData;
-
-    let (width, height) = (image.width(), image.height());
-    let image_data: Vec<u8> = image.into_vec();
-    ImageData {
-        data: Blob::new(std::sync::Arc::new(image_data)),
-        format: vello::peniko::ImageFormat::Rgba8,
-        alpha_type: ImageAlphaType::AlphaPremultiplied,
-        width,
-        height,
-    }
-    .into()
-}
-
-pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, Affine)> {
+pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(PaintType, Affine)> {
     match paint {
         usvg::Paint::Color(color) => Some((
             Brush::Solid(Color::from_rgba8(
@@ -122,10 +103,10 @@ pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, A
             Affine::IDENTITY,
         )),
         usvg::Paint::LinearGradient(gr) => {
-            let stops: Vec<vello::peniko::ColorStop> = gr
+            let stops: Vec<vello_common::peniko::ColorStop> = gr
                 .stops()
                 .iter()
-                .map(|stop| vello::peniko::ColorStop {
+                .map(|stop| vello_common::peniko::ColorStop {
                     offset: stop.offset().get(),
                     color: DynamicColor::from_alpha_color(Color::from_rgba8(
                         stop.color().red,
@@ -148,14 +129,14 @@ pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, A
             .map(f64::from);
             let transform = Affine::new(arr);
             let gradient =
-                vello::peniko::Gradient::new_linear(start, end).with_stops(stops.as_slice());
+                vello_common::peniko::Gradient::new_linear(start, end).with_stops(stops.as_slice());
             Some((Brush::Gradient(gradient), transform))
         }
         usvg::Paint::RadialGradient(gr) => {
-            let stops: Vec<vello::peniko::ColorStop> = gr
+            let stops: Vec<vello_common::peniko::ColorStop> = gr
                 .stops()
                 .iter()
-                .map(|stop| vello::peniko::ColorStop {
+                .map(|stop| vello_common::peniko::ColorStop {
                     offset: stop.offset().get(),
                     color: DynamicColor::from_alpha_color(Color::from_rgba8(
                         stop.color().red,
@@ -180,7 +161,7 @@ pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, A
             ]
             .map(f64::from);
             let transform = Affine::new(arr);
-            let gradient = vello::peniko::Gradient::new_two_point_radial(
+            let gradient = vello_common::peniko::Gradient::new_two_point_radial(
                 start_center,
                 start_radius,
                 end_center,
@@ -203,30 +184,7 @@ pub fn default_error_handler(scene: &mut Scene, node: &usvg::Node) {
         x1: bb.right() as f64,
         y1: bb.bottom() as f64,
     };
-    scene.fill(
-        Fill::NonZero,
-        Affine::IDENTITY,
-        palette::css::RED.with_alpha(0.5),
-        None,
-        &rect,
-    );
-}
-
-#[cfg(feature = "image")]
-pub fn decode_raw_raster_image(
-    img: &usvg::ImageKind,
-) -> Result<image::RgbaImage, image::ImageError> {
-    // All `image::ImageFormat` variants exist even if the feature in the image crate is disabled,
-    // but `image::load_from_memory_with_format` will fail with an Unsupported error if the
-    // image crate feature flag is disabled. So we don't need any of our own feature handling here.
-    let (data, format) = match img {
-        usvg::ImageKind::JPEG(data) => (data, image::ImageFormat::Jpeg),
-        usvg::ImageKind::PNG(data) => (data, image::ImageFormat::Png),
-        usvg::ImageKind::GIF(data) => (data, image::ImageFormat::Gif),
-        usvg::ImageKind::WEBP(data) => (data, image::ImageFormat::WebP),
-        usvg::ImageKind::SVG(_) => unreachable!(),
-    };
-
-    let dyn_image = image::load_from_memory_with_format(data, format)?;
-    Ok(dyn_image.into_rgba8())
+    scene.set_paint(palette::css::RED.with_alpha(0.5));
+    scene.set_transform(Affine::IDENTITY);
+    scene.fill_rect(&rect);
 }

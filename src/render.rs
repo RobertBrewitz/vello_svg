@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::util;
-use vello::Scene;
-use vello::kurbo::Affine;
-use vello::peniko::{BlendMode, Fill};
+use vello_common::kurbo::{Affine, Shape};
+use vello_common::peniko::{BlendMode, Fill, Mix};
+use vello_hybrid::Scene;
 
 pub(crate) fn render_group<F: FnMut(&mut Scene, &usvg::Node)>(
     scene: &mut Scene,
@@ -18,22 +18,22 @@ pub(crate) fn render_group<F: FnMut(&mut Scene, &usvg::Node)>(
             usvg::Node::Group(g) => {
                 let alpha = g.opacity().get();
                 let blend_mode: BlendMode = match g.blend_mode() {
-                    usvg::BlendMode::Normal => vello::peniko::Mix::Normal.into(),
-                    usvg::BlendMode::Multiply => vello::peniko::Mix::Multiply.into(),
-                    usvg::BlendMode::Screen => vello::peniko::Mix::Screen.into(),
-                    usvg::BlendMode::Overlay => vello::peniko::Mix::Overlay.into(),
-                    usvg::BlendMode::Darken => vello::peniko::Mix::Darken.into(),
-                    usvg::BlendMode::Lighten => vello::peniko::Mix::Lighten.into(),
-                    usvg::BlendMode::ColorDodge => vello::peniko::Mix::ColorDodge.into(),
-                    usvg::BlendMode::ColorBurn => vello::peniko::Mix::ColorBurn.into(),
-                    usvg::BlendMode::HardLight => vello::peniko::Mix::HardLight.into(),
-                    usvg::BlendMode::SoftLight => vello::peniko::Mix::SoftLight.into(),
-                    usvg::BlendMode::Difference => vello::peniko::Mix::Difference.into(),
-                    usvg::BlendMode::Exclusion => vello::peniko::Mix::Exclusion.into(),
-                    usvg::BlendMode::Hue => vello::peniko::Mix::Hue.into(),
-                    usvg::BlendMode::Saturation => vello::peniko::Mix::Saturation.into(),
-                    usvg::BlendMode::Color => vello::peniko::Mix::Color.into(),
-                    usvg::BlendMode::Luminosity => vello::peniko::Mix::Luminosity.into(),
+                    usvg::BlendMode::Normal => Mix::Normal.into(),
+                    usvg::BlendMode::Multiply => Mix::Multiply.into(),
+                    usvg::BlendMode::Screen => Mix::Screen.into(),
+                    usvg::BlendMode::Overlay => Mix::Overlay.into(),
+                    usvg::BlendMode::Darken => Mix::Darken.into(),
+                    usvg::BlendMode::Lighten => Mix::Lighten.into(),
+                    usvg::BlendMode::ColorDodge => Mix::ColorDodge.into(),
+                    usvg::BlendMode::ColorBurn => Mix::ColorBurn.into(),
+                    usvg::BlendMode::HardLight => Mix::HardLight.into(),
+                    usvg::BlendMode::SoftLight => Mix::SoftLight.into(),
+                    usvg::BlendMode::Difference => Mix::Difference.into(),
+                    usvg::BlendMode::Exclusion => Mix::Exclusion.into(),
+                    usvg::BlendMode::Hue => Mix::Hue.into(),
+                    usvg::BlendMode::Saturation => Mix::Saturation.into(),
+                    usvg::BlendMode::Color => Mix::Color.into(),
+                    usvg::BlendMode::Luminosity => Mix::Luminosity.into(),
                 };
 
                 let clipped = match g
@@ -43,18 +43,34 @@ pub(crate) fn render_group<F: FnMut(&mut Scene, &usvg::Node)>(
                 {
                     Some(usvg::Node::Path(clip_path)) => {
                         let local_path = util::to_bez_path(clip_path);
-                        scene.push_layer(Fill::NonZero, blend_mode, alpha, transform, &local_path);
-
+                        scene.set_transform(transform);
+                        scene.set_fill_rule(Fill::NonZero);
+                        scene.push_layer(
+                            Some(&local_path),
+                            Some(blend_mode),
+                            Some(alpha),
+                            None,
+                            None,
+                        );
                         true
                     }
                     _ => {
                         // Use bounding box as the clip path.
                         let bounding_box = g.layer_bounding_box();
-                        let rect = vello::kurbo::Rect::from_origin_size(
+                        let rect = vello_common::kurbo::Rect::from_origin_size(
                             (bounding_box.x(), bounding_box.y()),
                             (bounding_box.width() as f64, bounding_box.height() as f64),
                         );
-                        scene.push_layer(Fill::NonZero, blend_mode, alpha, transform, &rect);
+                        let clip_bezpath = rect.to_path(0.1);
+                        scene.set_transform(transform);
+                        scene.set_fill_rule(Fill::NonZero);
+                        scene.push_layer(
+                            Some(&clip_bezpath),
+                            Some(blend_mode),
+                            Some(alpha),
+                            None,
+                            None,
+                        );
                         true
                     }
                 };
@@ -76,16 +92,14 @@ pub(crate) fn render_group<F: FnMut(&mut Scene, &usvg::Node)>(
                         if let Some((brush, brush_transform)) =
                             util::to_brush(fill.paint(), fill.opacity())
                         {
-                            scene.fill(
-                                match fill.rule() {
-                                    usvg::FillRule::NonZero => Fill::NonZero,
-                                    usvg::FillRule::EvenOdd => Fill::EvenOdd,
-                                },
-                                transform,
-                                &brush,
-                                Some(brush_transform),
-                                &local_path,
-                            );
+                            scene.set_fill_rule(match fill.rule() {
+                                usvg::FillRule::NonZero => Fill::NonZero,
+                                usvg::FillRule::EvenOdd => Fill::EvenOdd,
+                            });
+                            scene.set_transform(transform);
+                            scene.set_paint(brush);
+                            scene.set_paint_transform(brush_transform);
+                            scene.fill_path(&local_path);
                         } else {
                             error_handler(scene, node);
                         }
@@ -97,13 +111,11 @@ pub(crate) fn render_group<F: FnMut(&mut Scene, &usvg::Node)>(
                             util::to_brush(stroke.paint(), stroke.opacity())
                         {
                             let conv_stroke = util::to_stroke(stroke);
-                            scene.stroke(
-                                &conv_stroke,
-                                transform,
-                                &brush,
-                                Some(brush_transform),
-                                &local_path,
-                            );
+                            scene.set_stroke(conv_stroke);
+                            scene.set_transform(transform);
+                            scene.set_paint(brush);
+                            scene.set_paint_transform(brush_transform);
+                            scene.stroke_path(&local_path);
                         } else {
                             error_handler(scene, node);
                         }
@@ -129,23 +141,8 @@ pub(crate) fn render_group<F: FnMut(&mut Scene, &usvg::Node)>(
                     | usvg::ImageKind::PNG(_)
                     | usvg::ImageKind::GIF(_)
                     | usvg::ImageKind::WEBP(_) => {
-                        #[cfg(feature = "image")]
-                        {
-                            let Ok(decoded_image) = util::decode_raw_raster_image(img.kind())
-                            else {
-                                error_handler(scene, node);
-                                continue;
-                            };
-                            let image = util::into_image(decoded_image);
-                            let image_ts = util::to_affine(&img.abs_transform());
-                            scene.draw_image(&image, image_ts);
-                        }
-
-                        #[cfg(not(feature = "image"))]
-                        {
-                            error_handler(scene, node);
-                            continue;
-                        }
+                        error_handler(scene, node);
+                        continue;
                     }
                     usvg::ImageKind::SVG(svg) => {
                         render_group(scene, svg.root(), transform, error_handler);
