@@ -116,6 +116,11 @@ pub fn append_tree(scene: &mut Scene, svg: &usvg::Tree) {
     append_tree_with(scene, svg, &mut util::default_error_handler);
 }
 
+/// Append an [`usvg::Tree`] to a `vello_hybrid` [`Scene`] with a base transform applied to all elements.
+pub fn append_tree_with_transform(scene: &mut Scene, svg: &usvg::Tree, transform: Affine) {
+    render::render_group(scene, svg.root(), transform, &mut util::default_error_handler);
+}
+
 /// Append an [`usvg::Tree`] to a `vello_hybrid` [`Scene`], with user-provided error handling logic.
 ///
 /// See the [module level documentation](crate#unsupported-features) for a list of some unsupported svg features
