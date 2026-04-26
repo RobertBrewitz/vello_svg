@@ -75,8 +75,10 @@ clippy.wildcard_dependencies = "warn"
 
 [workspace.dependencies]
 # NOTE: Make sure to keep this in sync with the version badge in README.md
-vello_hybrid = { path = "../vello/sparse_strips/vello_hybrid" }
-vello_common = { path = "../vello/sparse_strips/vello_common", features = ["std"] }
+vello_hybrid = "0.0.7"
+vello_common = { version = "0.0.7", features = ["std"] }
+# vello_hybrid = { path = "../vello/sparse_strips/vello_hybrid" }
+# vello_common = { path = "../vello/sparse_strips/vello_common", features = ["std"] }
 
 [package]
 name = "vello_svg"
@@ -116,6 +118,20 @@ vello_hybrid = { workspace = true }
 vello_common = { workspace = true }
 thiserror = "2.0.18"
 usvg = "0.46.0"
+image = { version = "0.25.9", default-features = false, features = [
+    "webp",
+    "png",
+    "jpeg",
+    "gif",
+], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3.58"
+
+[features]
+default = ["image_format_png", "image_format_gif", "image_format_jpeg", "image_format_webp"]
+image = ["dep:image"]
+image_format_png = ["image", "image/png"]
+image_format_jpeg = ["image", "image/jpeg"]
+image_format_gif = ["image", "image/gif"]
+image_format_webp = ["image", "image/webp"]

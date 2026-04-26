@@ -141,8 +141,33 @@ pub(crate) fn render_group<F: FnMut(&mut Scene, &usvg::Node)>(
                     | usvg::ImageKind::PNG(_)
                     | usvg::ImageKind::GIF(_)
                     | usvg::ImageKind::WEBP(_) => {
-                        error_handler(scene, node);
-                        continue;
+                        #[cfg(feature = "image")]
+                        {
+                            let Ok(decoded_image) = util::decode_raw_raster_image(img.kind())
+                            else {
+                                error_handler(scene, node);
+                                continue;
+                            };
+                            let width = decoded_image.width();
+                            let height = decoded_image.height();
+                            let image = util::into_image(decoded_image);
+                            let image_ts = util::to_affine(&img.abs_transform());
+                            let image_rect = vello_common::kurbo::Rect::new(
+                                0.0,
+                                0.0,
+                                f64::from(width),
+                                f64::from(height),
+                            );
+                            scene.set_transform(image_ts);
+                            scene.set_paint(image);
+                            scene.fill_rect(&image_rect);
+                        }
+
+                        #[cfg(not(feature = "image"))]
+                        {
+                            error_handler(scene, node);
+                            continue;
+                        }
                     }
                     usvg::ImageKind::SVG(svg) => {
                         render_group(scene, svg.root(), transform, error_handler);

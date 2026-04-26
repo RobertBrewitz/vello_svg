@@ -7,6 +7,9 @@ use vello_common::peniko::color::{DynamicColor, palette};
 use vello_common::peniko::{Brush, Color};
 use vello_hybrid::Scene;
 
+#[cfg(feature = "image")]
+use vello_common::paint::Image;
+
 pub fn to_affine(ts: &usvg::Transform) -> Affine {
     let usvg::Transform {
         sx,
@@ -89,6 +92,26 @@ pub fn to_bez_path(path: &usvg::Path) -> BezPath {
     }
 
     local_path
+}
+
+#[cfg(feature = "image")]
+pub fn into_image(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> Image {
+    use vello_common::paint::ImageSource;
+    use vello_common::peniko::{Blob, ImageAlphaType, ImageData, ImageFormat, ImageSampler};
+
+    let (width, height) = (image.width(), image.height());
+    let image_data: Vec<u8> = image.into_vec();
+    let peniko_image = ImageData {
+        data: Blob::new(std::sync::Arc::new(image_data)),
+        format: ImageFormat::Rgba8,
+        alpha_type: ImageAlphaType::Alpha,
+        width,
+        height,
+    };
+    Image {
+        image: ImageSource::from_peniko_image_data(&peniko_image),
+        sampler: ImageSampler::default(),
+    }
 }
 
 pub fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(PaintType, Affine)> {
@@ -187,4 +210,23 @@ pub fn default_error_handler(scene: &mut Scene, node: &usvg::Node) {
     scene.set_paint(palette::css::RED.with_alpha(0.5));
     scene.set_transform(Affine::IDENTITY);
     scene.fill_rect(&rect);
+}
+
+#[cfg(feature = "image")]
+pub fn decode_raw_raster_image(
+    img: &usvg::ImageKind,
+) -> Result<image::RgbaImage, image::ImageError> {
+    // All `image::ImageFormat` variants exist even if the feature in the image crate is disabled,
+    // but `image::load_from_memory_with_format` will fail with an Unsupported error if the
+    // image crate feature flag is disabled. So we don't need any of our own feature handling here.
+    let (data, format) = match img {
+        usvg::ImageKind::JPEG(data) => (data, image::ImageFormat::Jpeg),
+        usvg::ImageKind::PNG(data) => (data, image::ImageFormat::Png),
+        usvg::ImageKind::GIF(data) => (data, image::ImageFormat::Gif),
+        usvg::ImageKind::WEBP(data) => (data, image::ImageFormat::WebP),
+        usvg::ImageKind::SVG(_) => unreachable!(),
+    };
+
+    let dyn_image = image::load_from_memory_with_format(data, format)?;
+    Ok(dyn_image.into_rgba8())
 }
