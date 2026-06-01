@@ -118,7 +118,12 @@ pub fn append_tree(scene: &mut Scene, svg: &usvg::Tree) {
 
 /// Append an [`usvg::Tree`] to a `vello_hybrid` [`Scene`] with a base transform applied to all elements.
 pub fn append_tree_with_transform(scene: &mut Scene, svg: &usvg::Tree, transform: Affine) {
-    render::render_group(scene, svg.root(), transform, &mut util::default_error_handler);
+    render::render_group(
+        scene,
+        svg.root(),
+        transform,
+        &mut util::default_error_handler,
+    );
 }
 
 /// Append an [`usvg::Tree`] to a `vello_hybrid` [`Scene`], with user-provided error handling logic.
