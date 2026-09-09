@@ -15,6 +15,22 @@ You can find its changes [documented below](#090-2026-01-29).
 
 This release has an [MSRV][] of 1.88.
 
+### Added
+
+- Added the `RenderSink` abstraction and generic `append*` APIs ([#88][] by [@RobertBrewitz])
+
+### Changed
+
+- **Breaking:** Removed the `image` and `image_format_*` features and the public helpers `into_image` and `decode_raw_raster_image`, implement `RenderSink::draw_image` to handle decoding and rendering. ([#88][] by [@RobertBrewitz])
+
+- Made Vello optional behind the default `vello` feature ([#88][] by [@RobertBrewitz])
+- Updated vello to 0.10.0 ([#88][] by [@RobertBrewitz])
+- Updated usvg to 0.48.0 ([#88][] by [@RobertBrewitz])
+
+### Fixed
+
+- Fixed transforms for nested groups in embedded SVGs and flattened text, and for unsupported-element placeholders. ([#88][] by [@RobertBrewitz])
+
 ## [0.10.0][] (2026-07-19)
 
 This release has an [MSRV][] of 1.88.
@@ -162,6 +178,7 @@ This release has an [MSRV][] of 1.75.
 [@DasLixou]: https://github.com/DasLixou
 [@RobertBrewitz]: https://github.com/RobertBrewitz
 
+[#88]: https://github.com/linebender/vello_svg/pull/88
 [#85]: https://github.com/linebender/vello_svg/pull/85
 [#63]: https://github.com/linebender/vello_svg/pull/63
 [#61]: https://github.com/linebender/vello_svg/pull/61

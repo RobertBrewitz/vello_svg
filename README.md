@@ -2,12 +2,14 @@
 
 # Vello SVG
 
-**An integration to parse and render SVG with [Vello](https://vello.dev).**
+**A library to parse and render SVG documents.**
+
+Render with the (optional) built-in [Vello](https://vello.dev) integration, or implement the [`RenderSink`](src/render.rs) trait to bring your own renderer.
 
 [![Linebender Zulip](https://img.shields.io/badge/Linebender-%23vello-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/channel/197075-vello)
 [![dependency status](https://deps.rs/repo/github/linebender/vello_svg/status.svg)](https://deps.rs/repo/github/linebender/vello_svg)
 [![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](#license)
-[![vello version](https://img.shields.io/badge/vello-v0.9.0-purple.svg)](https://crates.io/crates/vello)\
+[![vello version](https://img.shields.io/badge/vello-v0.10.0-purple.svg)](https://crates.io/crates/vello)\
 [![Crates.io](https://img.shields.io/crates/v/vello_svg.svg)](https://crates.io/crates/vello_svg)
 [![Docs](https://docs.rs/vello_svg/badge.svg)](https://docs.rs/vello_svg)
 [![Build status](https://github.com/linebender/vello_svg/workflows/CI/badge.svg)](https://github.com/linebender/vello_svg/actions)
@@ -21,6 +23,7 @@
 
 | vello_svg | vello | usvg | image |
 | --------- | ----- | ---- | ----- |
+| main      | 0.10  | 0.48 | -     |
 | 0.10      | 0.9   | 0.46 | 0.25  |
 | 0.9       | 0.7   | 0.46 | 0.25  |
 | 0.8       | 0.6   | 0.45 | 0.25  |
@@ -31,6 +34,43 @@
 | 0.3       | 0.2   | 0.42 | 0.25  |
 | 0.2       | 0.1   | 0.41 | 0.25  |
 | 0.1       | 0.1   | 0.40 | 0.24  |
+
+## Usage
+
+These examples target a local checkout of the development version.
+
+### Custom backend
+
+If your backend doesn't use Vello, disable default features:
+
+```toml
+vello_svg = { path = "path/to/vello_svg", default-features = false }
+```
+
+Implement `RenderSink` using the re-exported `kurbo` and `peniko` types, then call `append(&mut sink, svg)` or `append_tree(&mut sink, &tree)`.
+
+Raster images require a custom `RenderSink::draw_image` implementation for decoding and rendering. See [ImageSink](examples/scenes/src/image_sink.rs) for a Vello wrapper using the `image` crate. Embedded SVG images render as vectors.
+
+### Built-in Vello backend
+
+The `vello` feature is enabled by default:
+
+```toml
+vello_svg = { path = "path/to/vello_svg" }
+```
+
+```rust
+let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+    <circle cx="50" cy="50" r="40" fill="red"/>
+</svg>"#;
+let scene = vello_svg::render(svg).expect("valid SVG");
+```
+
+- `render_tree(&tree)`: create a scene from a parsed `usvg::Tree`.
+- `append(&mut scene, svg)` / `append_tree(&mut scene, &tree)`: add to an existing scene.
+- Enable `wgpu` for Vello's GPU renderer.
+
+The built-in backend skips raster images.
 
 ## Examples
 
@@ -44,6 +84,14 @@ You can also load an entire folder or individual files.
 
 ```shell
 cargo run -p with_winit -- examples/assets
+```
+
+### Custom RenderSink with raster images
+
+[ImageSink](examples/scenes/src/image_sink.rs) wraps Vello with `image` decoding, caching, and decode-error reporting. The viewer uses it for SVG files:
+
+```shell
+cargo run -p with_winit -- examples/assets/raster_image.svg
 ```
 
 ### Web platform
@@ -68,7 +116,7 @@ There is also a web demo [available here](https://linebender.github.io/vello_svg
 
 ## Minimum supported Rust Version (MSRV)
 
-This version of Vello SVG has been verified to compile with **Rust 1.85** and later.
+This version of Vello SVG has been verified to compile with **Rust 1.88** and later.
 
 Future versions of Vello SVG might increase the Rust version requirement.
 It will not be treated as a breaking change and as such can even happen with small patch releases.
@@ -76,7 +124,7 @@ It will not be treated as a breaking change and as such can even happen with sma
 <details>
 <summary>Click here if compiling fails.</summary>
 
-As time has passed, some of Velato's dependencies could have released versions with a higher Rust requirement.
+As time has passed, some of Vello SVG's dependencies could have released versions with a higher Rust requirement.
 If you encounter a compilation issue due to a dependency and don't want to upgrade your Rust toolchain, then you could downgrade the dependency.
 
 ```sh
@@ -88,7 +136,7 @@ cargo update -p package_name --precise 0.1.1
 
 ## Community
 
-Discussion of Velato development happens in the [Linebender Zulip](https://xi.zulipchat.com/), specifically the [#vello channel](https://xi.zulipchat.com/#narrow/channel/197075-vello). All public content can be read without logging in.
+Discussion of Vello SVG development happens in the [Linebender Zulip](https://xi.zulipchat.com/), specifically the [#vello channel](https://xi.zulipchat.com/#narrow/channel/197075-vello). All public content can be read without logging in.
 
 Contributions are welcome by pull request. The [Rust code of conduct](https://www.rust-lang.org/policies/code-of-conduct) applies.
 
@@ -97,9 +145,9 @@ Contributions are welcome by pull request. The [Rust code of conduct](https://ww
 Licensed under either of
 
 - Apache License, Version 2.0
-   ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+  ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
 - MIT license
-   ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
+  ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option
 
